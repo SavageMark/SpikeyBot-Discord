@@ -3,6 +3,7 @@
 const fs = require('fs');
 const sql = require('mysql');
 const Jimp = require('jimp');
+const auth = require('../auth.js');
 const mkdirp = require('mkdirp'); // mkdir -p
 const rimraf = require('rimraf'); // rm -rf
 const funTranslator = require('./lib/funTranslators.js');
@@ -70,7 +71,7 @@ function HungryGames() {
    */
   const hgSaveDir = '/hg/';
   /**
-   * The file path to read default events.
+   * The file path to read default event IDs to then load into memory.
    * @see {@link HungryGames~defaultPlayerEvents}
    * @see {@link HungryGames~defaultArenaEvents}
    * @see {@link HungryGames~defaultBloodbathEvents}
@@ -80,7 +81,7 @@ function HungryGames() {
    * @constant
    * @default
    */
-  const eventFile = './save/hgEvents.json';
+  const eventFileList = './save/hgDefaultEvents.json';
   /**
    * Directory to store all HG events with the files in subdirectories named by
    * the creator's ID, then the files named by their ID.
@@ -683,7 +684,7 @@ function HungryGames() {
   let weapons = {};
   /**
    * Default parsed bloodbath events.
-   * @see {@link HungryGames~eventFile}
+   * @see {@link HungryGames~eventFileList}
    *
    * @private
    * @type {HungryGames~Event[]}
@@ -691,7 +692,7 @@ function HungryGames() {
   let defaultBloodbathEvents = [];
   /**
    * Default parsed player events.
-   * @see {@link HungryGames~eventFile}
+   * @see {@link HungryGames~eventFileList}
    *
    * @private
    * @type {HungryGames~Event[]}
@@ -699,7 +700,7 @@ function HungryGames() {
   let defaultPlayerEvents = [];
   /**
    * Default parsed arena events.
-   * @see {@link HungryGames~eventFile}
+   * @see {@link HungryGames~eventFileList}
    *
    * @private
    * @type {HungryGames~ArenaEvent[]}
@@ -732,32 +733,79 @@ function HungryGames() {
   let listenersEndTime = 0;
 
   /**
-   * Parse all default events from file.
+   * Parse all default event IDs from file then load the events into memory.
    *
    * @private
    */
   function updateEvents() {
-    fs.readFile(eventFile, function(err, data) {
+    fs.readFile(eventFileList, (err, data) => {
       if (err) return;
+      let parsed;
       try {
-        let parsed = JSON.parse(data);
-        if (parsed) {
-          let finalParsed = {bloodbath: [], player: [], arena: []};
-          parsed['bloodbath'].forEach(
-              (el) => {
-
-              });
-          defaultBloodbathEvents = deepFreeze(finalParsed.bloodbath);
-          defaultPlayerEvents = deepFreeze(parsed['player']);
-          defaultArenaEvents = deepFreeze(parsed['arena']);
-        }
+        parsed = JSON.parse(data);
       } catch (err) {
         console.log(err);
+        return;
       }
+      if (!parsed) return;
+
+      /**
+       * For each given event ID, read and parse the event from file, then push
+       * it into the given array.
+       *
+       * @param {Array} array The array to augment with the new events.
+       * @return {Function} Function callback to pass into an array forEach
+       * loop.
+       */
+      function forEach(array) {
+        return function(el) {
+          let existing = array.find((evt) => evt.id == el);
+          if (existing) return;
+          fs.readFile(eventDir + el + '.json', (err, data) => {
+            if (err) {
+              self.error(
+                  'Failed to read event file: ' + eventDir + el + '.json');
+              console.error(err);
+              return;
+            }
+            let parsed;
+            try {
+              parsed = JSON.parse(data);
+            } catch (e) {
+              self.error('Failed to parse event file: ' + el);
+              console.error(e);
+              return;
+            }
+            array.push(deepFreeze(parsed));
+          });
+        };
+      }
+
+      /**
+       * Same as {@link forEach} except this purges events from memory that are
+       * no longer in the ID file.
+       *
+       * @param {Array} array The array to purge old events.
+       * @return {Function} Function callback to pass into an array forEach
+       * loop.
+       */
+      function purge(array) {
+        return function(el) {
+          let exists = array.findIndex((evt) => evt.id == el.id);
+          if (exists > -1) return;
+          array.splice(exists, 1);
+        };
+      }
+      parsed.bloodbath.forEach(forEach(defaultBloodbathEvents));
+      parsed.bloodbath.forEach(purge(defaultBloodbathEvents));
+      parsed.player.forEach(forEach(defaultPlayerEvents));
+      parsed.player.forEach(purge(defaultPlayerEvents));
+      parsed.arena.forEach(forEach(defaultArenaEvents));
+      parsed.arena.forEach(purge(defaultArenaEvents));
     });
   }
   updateEvents();
-  fs.watchFile(eventFile, function(curr, prev) {
+  fs.watchFile(eventFileList, function(curr, prev) {
     if (curr.mtime == prev.mtime) return;
     if (self.initialized) {
       self.debug('Re-reading default events from file');
@@ -1117,7 +1165,7 @@ function HungryGames() {
     web = null;
     delete require.cache[require.resolve('./web/hg.js')];
 
-    fs.unwatchFile(eventFile);
+    fs.unwatchFile(eventFileList);
     fs.unwatchFile(messageFile);
     fs.unwatchFile(battleFile);
     fs.unwatchFile(weaponsFile);

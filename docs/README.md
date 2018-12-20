@@ -2765,10 +2765,12 @@ Hunger Games simulator.
         * [~newEventMessages](#HungryGames..newEventMessages) : <code>Object.&lt;Discord~Message&gt;</code> ℗
         * [~optionMessages](#HungryGames..optionMessages) : <code>Object.&lt;Discord~Message&gt;</code> ℗
         * [~listenersEndTime](#HungryGames..listenersEndTime) : <code>number</code> ℗
+        * [~sqlCon](#HungryGames..sqlCon) : <code>sql.ConnectionConfig</code> ℗
         * [~patreonSettingKeys](#HungryGames..patreonSettingKeys) : <code>Array.&lt;string&gt;</code> ℗
         * [~saveFile](#HungryGames..saveFile) : <code>string</code> ℗
         * [~hgSaveDir](#HungryGames..hgSaveDir) : <code>string</code> ℗
-        * [~eventFile](#HungryGames..eventFile) : <code>string</code> ℗
+        * [~eventFileList](#HungryGames..eventFileList) : <code>string</code> ℗
+        * [~eventDir](#HungryGames..eventDir) : <code>string</code> ℗
         * [~messageFile](#HungryGames..messageFile) : <code>string</code> ℗
         * [~battleFile](#HungryGames..battleFile) : <code>string</code> ℗
         * [~weaponsFile](#HungryGames..weaponsFile) : <code>string</code> ℗
@@ -2791,6 +2793,7 @@ Hunger Games simulator.
         * [~blockedmessage](#HungryGames..blockedmessage) : <code>string</code> ℗
         * [~helpObject](#HungryGames..helpObject) ℗
         * [~updateEvents()](#HungryGames..updateEvents) ℗
+        * [~connectSQL()](#HungryGames..connectSQL) ℗
         * [~updateMessages()](#HungryGames..updateMessages) ℗
         * [~updateBattles()](#HungryGames..updateBattles) ℗
         * [~updateWeapons()](#HungryGames..updateWeapons) ℗
@@ -3622,7 +3625,7 @@ Default parsed bloodbath events.
 
 **Kind**: inner property of [<code>HungryGames</code>](#HungryGames)  
 **Access**: private  
-**See**: [eventFile](#HungryGames..eventFile)  
+**See**: [eventFileList](#HungryGames..eventFileList)  
 <a name="HungryGames..defaultPlayerEvents"></a>
 
 ### HungryGames~defaultPlayerEvents : [<code>Array.&lt;Event&gt;</code>](#HungryGames..Event) ℗
@@ -3630,7 +3633,7 @@ Default parsed player events.
 
 **Kind**: inner property of [<code>HungryGames</code>](#HungryGames)  
 **Access**: private  
-**See**: [eventFile](#HungryGames..eventFile)  
+**See**: [eventFileList](#HungryGames..eventFileList)  
 <a name="HungryGames..defaultArenaEvents"></a>
 
 ### HungryGames~defaultArenaEvents : [<code>Array.&lt;ArenaEvent&gt;</code>](#HungryGames..ArenaEvent) ℗
@@ -3638,7 +3641,7 @@ Default parsed arena events.
 
 **Kind**: inner property of [<code>HungryGames</code>](#HungryGames)  
 **Access**: private  
-**See**: [eventFile](#HungryGames..eventFile)  
+**See**: [eventFileList](#HungryGames..eventFileList)  
 <a name="HungryGames..newEventMessages"></a>
 
 ### HungryGames~newEventMessages : <code>Object.&lt;Discord~Message&gt;</code> ℗
@@ -3661,6 +3664,13 @@ Messages I have sent showing current options.
 ### HungryGames~listenersEndTime : <code>number</code> ℗
 The last time the currently scheduled reaction event listeners are expected
 to end. Used for checking of submoduleis unloadable.
+
+**Kind**: inner property of [<code>HungryGames</code>](#HungryGames)  
+**Access**: private  
+<a name="HungryGames..sqlCon"></a>
+
+### HungryGames~sqlCon : <code>sql.ConnectionConfig</code> ℗
+The object describing the connection with the SQL server.
 
 **Kind**: inner property of [<code>HungryGames</code>](#HungryGames)  
 **Access**: private  
@@ -3704,13 +3714,13 @@ of individual guilds.
 - [saveFile](#HungryGames..saveFile)
 - [HungryGames~saveFileDir](HungryGames~saveFileDir)
 
-<a name="HungryGames..eventFile"></a>
+<a name="HungryGames..eventFileList"></a>
 
-### HungryGames~eventFile : <code>string</code> ℗
-The file path to read default events.
+### HungryGames~eventFileList : <code>string</code> ℗
+The file path to read default event IDs to then load into memory.
 
 **Kind**: inner constant of [<code>HungryGames</code>](#HungryGames)  
-**Default**: <code>&quot;./save/hgEvents.json&quot;</code>  
+**Default**: <code>&quot;./save/hgDefaultEvents.json&quot;</code>  
 **Access**: private  
 **See**
 
@@ -3718,6 +3728,16 @@ The file path to read default events.
 - [defaultArenaEvents](#HungryGames..defaultArenaEvents)
 - [defaultBloodbathEvents](#HungryGames..defaultBloodbathEvents)
 
+<a name="HungryGames..eventDir"></a>
+
+### HungryGames~eventDir : <code>string</code> ℗
+Directory to store all HG events with the files in subdirectories named by
+the creator's ID, then the files named by their ID.
+"eventDir/CreatorID/eventID.json"
+
+**Kind**: inner constant of [<code>HungryGames</code>](#HungryGames)  
+**Default**: <code>&quot;./save/hg/events/&quot;</code>  
+**Access**: private  
 <a name="HungryGames..messageFile"></a>
 
 ### HungryGames~messageFile : <code>string</code> ℗
@@ -3892,7 +3912,14 @@ The object that stores all data to be formatted into the help message.
 <a name="HungryGames..updateEvents"></a>
 
 ### HungryGames~updateEvents() ℗
-Parse all default events from file.
+Parse all default event IDs from file then load the events into memory.
+
+**Kind**: inner method of [<code>HungryGames</code>](#HungryGames)  
+**Access**: private  
+<a name="HungryGames..connectSQL"></a>
+
+### HungryGames~connectSQL() ℗
+Create initial connection with sql server.
 
 **Kind**: inner method of [<code>HungryGames</code>](#HungryGames)  
 **Access**: private  

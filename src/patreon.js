@@ -175,6 +175,7 @@ function Patreon() {
   this.shutdown = function() {
     self.command.deleteEvent('patreon');
 
+    sqlCon.end();
     fs.unwatchFile(patreonTierPermFile);
     fs.unwatchFile(patreonSettingsTemplateFile);
   };

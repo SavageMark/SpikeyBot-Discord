@@ -144,6 +144,7 @@ function WebAccount() {
   this.shutdown = function(skipSave) {
     if (io) io.close();
     if (app) app.close();
+    sqlCon.end();
     fs.unwatchFile(patreonSettingsTemplateFile);
   };
 

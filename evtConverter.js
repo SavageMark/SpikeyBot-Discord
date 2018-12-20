@@ -91,9 +91,9 @@ oldEnt.forEach((el) => {
         });
       });
       let toSend = sqlCon.format(
-          'INSERT INTO HGEvents (Id, CreatorId, DateCreated, Privacy) ' +
-              'VALUES (?, ?, FROM_UNIXTIME(?), "public")',
-          [id, ownerId, now / 1000]);
+          'INSERT INTO HGEvents (Id, CreatorId, DateCreated, Privacy, ' +
+              'EventType) VALUES (?, ?, FROM_UNIXTIME(?), "public", ?)',
+          [id, ownerId, now / 1000, type]);
     });
   });
 });

@@ -173,6 +173,7 @@ function WebProxy() {
     if (io) io.close();
     if (app) app.close();
     clearInterval(purgeInterval);
+    sqlCon.end();
     if (!skipSave) {
       for (let i in loginInfo) {
         if (loginInfo[i] && loginInfo[i].refreshTimeout) {
