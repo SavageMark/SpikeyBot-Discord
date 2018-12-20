@@ -1,6 +1,7 @@
 // Copyright 2018 Campbell Crowley. All rights reserved.
 // Author: Campbell Crowley (dev@campbellcrowley.com)
 const fs = require('fs');
+const sql = require('mysql');
 const Jimp = require('jimp');
 const mkdirp = require('mkdirp'); // mkdir -p
 const rimraf = require('rimraf'); // rm -rf
@@ -80,6 +81,17 @@ function HungryGames() {
    * @default
    */
   const eventFile = './save/hgEvents.json';
+  /**
+   * Directory to store all HG events with the files in subdirectories named by
+   * the creator's ID, then the files named by their ID.
+   * "eventDir/CreatorID/eventID.json"
+   *
+   * @private
+   * @type {string}
+   * @constant
+   * @default
+   */
+  const eventDir = './save/hg/events/';
   /**
    * The file path to read messages.
    * @see {@link HungryGames~messages}
@@ -730,7 +742,12 @@ function HungryGames() {
       try {
         let parsed = JSON.parse(data);
         if (parsed) {
-          defaultBloodbathEvents = deepFreeze(parsed['bloodbath']);
+          let finalParsed = {bloodbath: [], player: [], arena: []};
+          parsed['bloodbath'].forEach(
+              (el) => {
+
+              });
+          defaultBloodbathEvents = deepFreeze(finalParsed.bloodbath);
           defaultPlayerEvents = deepFreeze(parsed['player']);
           defaultArenaEvents = deepFreeze(parsed['arena']);
         }
@@ -749,6 +766,36 @@ function HungryGames() {
     }
     updateEvents();
   });
+
+  /**
+   * The object describing the connection with the SQL server.
+   *
+   * @private
+   * @type {sql.ConnectionConfig}
+   */
+  let sqlCon;
+  /**
+   * Create initial connection with sql server.
+   *
+   * @private
+   */
+  function connectSQL() {
+    /* eslint-disable-next-line new-cap */
+    sqlCon = new sql.createConnection({
+      user: auth.sqlUsername,
+      password: auth.sqlPassword,
+      host: auth.sqlHost,
+      database: 'appusers',
+      port: 3306,
+    });
+    sqlCon.on('error', function(e) {
+      self.error(e);
+      if (e.fatal) {
+        connectSQL();
+      }
+    });
+  }
+  connectSQL();
 
   /**
    * Parse all messages from file.
@@ -1065,6 +1112,7 @@ function HungryGames() {
     process.removeListener('SIGINT', sigint);
     process.removeListener('SIGHUP', sigint);
     process.removeListener('SIGTERM', sigint);
+    sqlCon.end();
     if (web) web.shutdown();
     web = null;
     delete require.cache[require.resolve('./web/hg.js')];
