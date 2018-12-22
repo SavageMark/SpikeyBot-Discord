@@ -163,24 +163,6 @@ function HungryGames() {
   const fetchSize = 128;
 
   /**
-   * Role that a user must have in order to perform any commands.
-   *
-   * @private
-   * @type {string}
-   * @constant
-   * @default
-   */
-  const roleName = 'HG Creator';
-  /**
-   * Role that a user must have in order to perform any commands.
-   *
-   * @public
-   * @type {string}
-   * @constant
-   */
-  this.roleName = roleName;
-
-  /**
    * Number of events to show on a single page of events.
    *
    * @private
@@ -971,8 +953,6 @@ function HungryGames() {
     tmpHelp.setTitle(helpObject.title);
     tmpHelp.setURL(
         self.common.webURL + '#' + encodeURIComponent(helpObject.title));
-    tmpHelp.setDescription(
-        helpObject.description.replaceAll('{hgRole}', roleName));
     helpObject.sections.forEach(function(obj) {
       let titleID = encodeURIComponent(obj.title);
       let titleURL = '[web](' + self.common.webHelp + '#' + titleID + ')';
