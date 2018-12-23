@@ -2,6 +2,7 @@
 // Author: Campbell Crowley (dev@campbellcrowley.com)
 const fs = require('fs');
 const sql = require('mysql');
+const path = require('path');
 const Jimp = require('jimp');
 const auth = require('../auth.js');
 const mkdirp = require('mkdirp'); // mkdir -p
@@ -557,7 +558,7 @@ function HungryGames() {
    */
 
   /**
-   * A singe instance of a game in a guild.
+   * A single instance of a game in a guild.
    * @typedef {Object} HungryGames~GuildGame
    *
    * @property {string[]} excludedUsers Array of user IDs that have been
@@ -572,10 +573,34 @@ function HungryGames() {
    *   {
    *     bloodbath: HungryGames~Event[],
    *     player: HungryGames~Event[],
-   *     weapon: HungryGames~WeaponEvent[],
+   *     weapon: Object.<HungryGames~WeaponEvent>,
    *     arena: HungryGames~ArenaEvent[]
    *   }
-   * } customEvents All custom events for the guild.
+   * } [legacyEvents] All custom events created prior to the ID system.
+   * @property {
+   *   {
+   *     bloodbath: HungryGames~Event[],
+   *     player: HungryGames~Event[],
+   *     weapon: Object.<HungryGames~WeaponEvent>,
+   *     arena: Object.<HungryGames~ArenaEvent>
+   *   }
+   * } disabledEvents All of the events that have been disabled for the guild.
+   * @property {
+   *   {
+   *     bloodbath: HungryGames~Event[],
+   *     player: HungryGames~Event[],
+   *     weapon: Object.<HungryGames~WeaponEvent>,
+   *     arena: HungryGames~ArenaEvent[]
+   *   }
+   * } customEvents All custom events currently loaded into memory.
+   * @property {
+   *   {
+   *     bloodbath: string[],
+   *     player: string[],
+   *     weapon: string[],
+   *     arena: string[]
+   *   }
+   * } customEventIds The IDs of all custom events to load for this guild.
    * @property {HungryGames~Game} currentGame The current game in the guild.
    */
 
@@ -1061,6 +1086,8 @@ function HungryGames() {
           mkCmd(commandWound), cmdOpts),
       new self.command.SingleCommand(
           ['rename', 'name'], mkCmd(commandRename), cmdOpts),
+      new self.command.SingleCommand(
+          ['claimlegacy'], mkCmd(commandClaimLegacy), cmdOpts),
     ];
     let hgCmd =
         new self.command.SingleCommand(
@@ -1109,6 +1136,11 @@ function HungryGames() {
     self.client.guilds.forEach((g) => {
       let game = find(g.id);
       if (!game) return;
+
+      if (game.customEvents) {
+        game.legacyEvents = game.customEvents;
+        delete game.customEvents;
+      }
 
       if (game.currentGame && game.currentGame.day.state > 1 &&
           game.currentGame.inProgress && !game.currentGame.ended) {
@@ -1579,12 +1611,22 @@ function HungryGames() {
           find(id).currentGame.numAlive =
               find(id).currentGame.includedUsers.length;
         }
+        if (find(id).legacyEvents) {
+          self.common.reply(
+              msg,
+              'Legacy custom events still exist. Type `hg claimlegacy` to ' +
+                  'move all custom events for this server to your account.',
+              'NOTICE: Whoever claims the custom events will own all custom ' +
+                  'events currently created, they will no longer be ' +
+                  'assiciated with the server.');
+        }
       } else {
         games[id] = {
           excludedUsers: [],
           includedUsers: [],
           disabledEvents: {bloodbath: [], player: [], arena: {}, weapon: {}},
           customEvents: {bloodbath: [], player: [], arena: [], weapon: {}},
+          customEventIds: {bloodbath: [], player: [], arena: [], weapon: []},
           currentGame: {
             name: msg.guild.name + '\'s Hungry Games',
             inProgress: false,
@@ -1951,6 +1993,10 @@ function HungryGames() {
       } else if (command == 'events') {
         find(id).customEvents =
             {bloodbath: [], player: [], arena: [], weapon: {}};
+        find(id).legacyEvents =
+            {bloodbath: [], player: [], arena: [], weapon: {}};
+        find(id).customEventIds =
+            {bloodbath: [], player: [], arena: [], weapon: []};
         return 'Resetting ALL Hungry Games events for this server!';
       } else if (command == 'current') {
         delete find(id).currentGame;
@@ -2476,6 +2522,21 @@ function HungryGames() {
               ' I have the "Embed Links" permission in this channel.');
       return;
     }
+
+    if (find(id).customEvents.bloodbath.length !=
+            find(id).customEventIds.bloodbath.length ||
+        find(id).customEvents.player.length !=
+            find(id).customEventIds.player.length ||
+        find(id).customEvents.arena.length !=
+            find(id).customEventIds.arena.length ||
+        Object.keys(find(id).customEvents.weapon).length !=
+            find(id).customEventIds.weapon.length) {
+      fetchCustomEvents(id, () => {
+        nextDay(msg, id, retry);
+      });
+      return;
+    }
+
     find(id).currentGame.day.state = 1;
     find(id).currentGame.day.num++;
     find(id).currentGame.day.events = [];
@@ -7175,6 +7236,148 @@ function HungryGames() {
   }
 
   /**
+   * The user will claim all legacy custom events to their account and thus
+   * convert them into the new custom event format.
+   *
+   * @private
+   * @type {HungryGames~hgCommandHandler}
+   * @param {Discord~Message} msg The message that lead to this being called.
+   * @param {string} id The id of the guild this was triggered from.
+   */
+  function commandClaimLegacy(msg, id) {
+    if (!find(gid) || !find(gid).legacyEvents) {
+      self.common.reply(
+          msg, 'It looks like there aren\'t any legacy events to claim.');
+      return;
+    }
+    self.claimLegacyEvents(msg.author.id, id, (err) => {
+      if (err) {
+        self.common.reply(
+            msg, 'Some events failed to be claimed due to internal errors.',
+            'Please try again at a later date once the issue has been ' +
+                'resolved.');
+      } else {
+        self.common.reply(
+            msg,
+            'You have claimed all legacy events. They will now appear as ' +
+                'custom events for your account.');
+      }
+    });
+  }
+  /**
+   * Claim legacy custom events for a specified user, thus updating the events
+   * to the ID based structure.
+   *
+   * @public
+   * @param {string|number} ownerId The Discord ID of the user of whom to claim
+   * the events for.
+   * @param {string|number} gid The ID of the guild of which to claim the events
+   * from.
+   * @param {basicCB} cb Callback with single argument. True if error, false if
+   * no error.
+   */
+  this.claimLegacyEvents = function(ownerId, gid, cb) {
+    if (!find(gid) || !find(gid).legacyEvents) {
+      cb(true);
+      return;
+    }
+    const now = Date.now();
+    let oldEnt = Object.entries(find(gid).legacyEvents);
+
+    let newIds = {};
+    let randList = {};
+
+    let numDone = 0;
+    let numTotal = 0;
+    let numError = 0;
+    mkdirp(eventDir + ownerId, (err) => {
+      if (err) {
+        self.error('Failed to create directory: ' + eventDir + ownerId);
+        console.error(err);
+        cb(true);
+        return;
+      }
+      oldEnt.forEach((el) => {
+        numTotal += el[1].length;
+        const type = el[0] == 'bloodbath' ? 'normal' : el[0];
+        newIds[el[0]] = [];
+
+        el[1].forEach((evt) => {
+          let rand;
+          // This should all happen really quickly, just to be safe, ensure
+          // there are no identical random numbers. Doesn't hurt to be extra
+          // careful here.
+          do {
+            rand = Math.floor((Math.random() * Math.pow(36, 6))).toString(36);
+          } while (randList[rand]);
+          randList[rand] = true;
+
+          const id = `${ownerId}/${now}-${rand}`;
+          newIds[el[0]].push(id);
+
+          evt.id = id;
+          evt.type = type;
+          evt.creator = ownerId;
+          evt.privacy = 'private';
+
+          let toSend = sqlCon.format(
+              'INSERT INTO HGEvents (Id, CreatorId, DateCreated, Privacy, ' +
+                  'EventType) VALUES (?, ?, FROM_UNIXTIME(?), "private", ?)',
+              [id, ownerId, now / 1000, type]);
+          fs.writeFile(eventDir + id + '.json', JSON.stringify(evt), (err) => {
+            if (err) {
+              self.error(
+                  'Failed to write custom event to file: ' + eventDir + id +
+                  '.json');
+              console.error(err);
+              numError++;
+              done();
+              return;
+            }
+            sqlCon.query(toSend, (err) => {
+              if (err) {
+                self.error(
+                    'Failed to put custom event into SQL database: ' + toSend);
+                console.error(err);
+                numError++;
+                done();
+                fs.unlink(eventDir + id + '.json', (err) => {
+                  if (!err) return;
+                  self.error(
+                      'FAILED TO CLEAN UP AFTER ERROR. UNABLE TO UNLINK ' +
+                      'HANGING FILE: ' + evnetDir + id + '.json');
+                });
+                return;
+              }
+              find(id).customEventIds[el[0]].push(id);
+              let index = find(gid).legacyEvents[el[0]].findIndex(
+                  (l) => eventsEqual(l, evt));
+              if (index < 0) {
+                self.error(
+                    'Failed to purge legacy event from cache: ' +
+                    JSON.stringify(evt));
+                numError++;
+              } else {
+                find(gid).legacyEvents[el[0]].splice(index, 1);
+              }
+              done();
+            });
+          });
+        });
+      });
+    });
+
+    /**
+     * Callback for each completed event request.
+     */
+    function done() {
+      numDone++;
+      if (numDone < numTotal) return;
+      cb(numError > 0);
+    }
+  };
+
+  /**
    * Force a player to have a certain outcome in the current day being
    * simulated, or the next day that will be simulated. This is acheived by
    * adding a custom event in which the player will be affected after their
@@ -7298,6 +7501,7 @@ function HungryGames() {
       'zip',
       'zippo',
       'diddly',
+      'nada',
       emoji.x,
     ];
     return nothings[Math.floor(Math.random() * nothings.length)];
@@ -7316,6 +7520,81 @@ function HungryGames() {
     const length = list.length;
     if (length == 0) return 'nomessage';
     return list[Math.floor(Math.random() * length)];
+  }
+
+  /**
+   * Fetch all events from the custom event ID list and cache them in memory.
+   * @TODO: Custom events are loaded into memory for every guild they are in.
+   * This is inefficient since multiple guilds may include the same event.
+   * Custom events should exist in memory at most 1 time.
+   *
+   * @private
+   * @param {string|number} id The ID of the guild to fetch custom events for.
+   * @param {function} cb The callback to call once complete.
+   */
+  function fetchCustomEvents(id, cb) {
+    if (!find(id) || !find(id).customEventIds || !find(id).customEvents) {
+      createGame(null, id, true, cb);
+      return;
+    }
+    let evts = find(id).customEvents;
+    let ids = find(id).customEventIds;
+    let types = Object.keys(ids);
+    let numTotal = 0;
+    let numDone = 0;
+    types.forEach((t) => {
+      let idList = ids[t];
+      numTotal += idList.length;
+      idList.forEach((el) => {
+        if (evts[t].find((evt) => evt.id == el)) {
+          done();
+          return;
+        }
+        let idPath = path.normalize(eventDir + el + '.json');
+        if (!idPath.startsWith(eventDir)) {
+          self.error('Forbidden id requested to load custom event: ' + el);
+          done();
+          return;
+        }
+        fs.readFile(idPath, (err, data) => {
+          if (err) {
+            self.error('Failed to load custom event from file: ' + idPath);
+            console.error(err);
+            done();
+            return;
+          }
+          let parsed;
+          try {
+            parsed = JSON.parse(data);
+          } catch (e) {
+            self.error('Custom event failed to parse: ' + idPath);
+            console.error(e);
+            done();
+            return;
+          }
+          if (t === 'weapon') {
+            evts[t][parsed.name] = parsed;
+          } else {
+            evts[t].push(parsed);
+          }
+          done();
+        });
+      });
+    });
+    if (numTotal == 0) {
+      cb();
+      return;
+    }
+
+    /**
+     * Callback for each completed event load.
+     * @private
+     */
+    function done() {
+      numDone++;
+      if (numDone < numTotal) return;
+      cb();
+    }
   }
 
   /**
@@ -7541,7 +7820,8 @@ function HungryGames() {
     }
     Object.entries(games).forEach(function(obj) {
       const id = obj[0];
-      const data = obj[1];
+      let data = Object.assign({}, obj[1]);
+      delete data.customEvents;
       const dir = self.common.guildSaveDir + id + hgSaveDir;
       const filename = dir + saveFile;
       const saveStartTime = Date.now();

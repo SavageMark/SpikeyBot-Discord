@@ -2730,6 +2730,8 @@ Hunger Games simulator.
         * [.toggleEvent(id, type, subCat, event, [value])](#HungryGames+toggleEvent) ⇒ <code>string</code>
         * [.eventsEqual(e1, e2)](#HungryGames+eventsEqual) ⇒ <code>boolean</code>
         * [.renameGame(id, name)](#HungryGames+renameGame) ⇒ <code>boolean</code>
+        * [.claimLegacyEvents(ownerId, gid, cb)](#HungryGames+claimLegacyEvents)
+            * [~done()](#HungryGames+claimLegacyEvents..done)
         * [.forcePlayerState(id, list, state, text, [persists])](#HungryGames+forcePlayerState) ⇒ <code>string</code>
         * [.getNumSimulating()](#HungryGames+getNumSimulating) ⇒ <code>number</code>
         * [.initialize()](#SubModule+initialize)
@@ -2871,8 +2873,11 @@ Hunger Games simulator.
         * [~commandHeal(msg, id)](#HungryGames..commandHeal) : [<code>hgCommandHandler</code>](#HungryGames..hgCommandHandler) ℗
         * [~commandWound(msg, id)](#HungryGames..commandWound) : [<code>hgCommandHandler</code>](#HungryGames..hgCommandHandler) ℗
         * [~commandRename(msg, id)](#HungryGames..commandRename) : [<code>hgCommandHandler</code>](#HungryGames..hgCommandHandler) ℗
+        * [~commandClaimLegacy(msg, id)](#HungryGames..commandClaimLegacy) : [<code>hgCommandHandler</code>](#HungryGames..hgCommandHandler) ℗
         * [~nothing()](#HungryGames..nothing) ⇒ <code>string</code> ℗
         * [~getMessage(type)](#HungryGames..getMessage) ⇒ <code>string</code> ℗
+        * [~fetchCustomEvents(id, cb)](#HungryGames..fetchCustomEvents) ℗
+            * [~done()](#HungryGames..fetchCustomEvents..done) ℗
         * [~find(id)](#HungryGames..find) ⇒ [<code>GuildGame</code>](#HungryGames..GuildGame) ℗
         * [~calcColNum(numCols, statusList)](#HungryGames..calcColNum) ⇒ <code>number</code> ℗
         * [~deepFreeze(object)](#HungryGames..deepFreeze) ⇒ <code>Object</code> ℗
@@ -3294,6 +3299,27 @@ due to a game not existing or the name being longer than 100 characters.
 | id | <code>string</code> \| <code>number</code> | The guild id of which to change the game's name. |
 | name | <code>string</code> | The custom name to change to. Must be 100 characters or fewer. |
 
+<a name="HungryGames+claimLegacyEvents"></a>
+
+### hungryGames.claimLegacyEvents(ownerId, gid, cb)
+Claim legacy custom events for a specified user, thus updating the events
+to the ID based structure.
+
+**Kind**: instance method of [<code>HungryGames</code>](#HungryGames)  
+**Access**: public  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| ownerId | <code>string</code> \| <code>number</code> | The Discord ID of the user of whom to claim the events for. |
+| gid | <code>string</code> \| <code>number</code> | The ID of the guild of which to claim the events from. |
+| cb | <code>basicCB</code> | Callback with single argument. True if error, false if no error. |
+
+<a name="HungryGames+claimLegacyEvents..done"></a>
+
+#### claimLegacyEvents~done()
+Callback for each completed event request.
+
+**Kind**: inner method of [<code>claimLegacyEvents</code>](#HungryGames+claimLegacyEvents)  
 <a name="HungryGames+forcePlayerState"></a>
 
 ### hungryGames.forcePlayerState(id, list, state, text, [persists]) ⇒ <code>string</code>
@@ -5030,6 +5056,20 @@ Rename a guild's game to a custom name.
 | msg | <code>Discord~Message</code> | The message that lead to this being called. |
 | id | <code>string</code> | The id of the guild this was triggered from. |
 
+<a name="HungryGames..commandClaimLegacy"></a>
+
+### HungryGames~commandClaimLegacy(msg, id) : [<code>hgCommandHandler</code>](#HungryGames..hgCommandHandler) ℗
+The user will claim all legacy custom events to their account and thus
+convert them into the new custom event format.
+
+**Kind**: inner method of [<code>HungryGames</code>](#HungryGames)  
+**Access**: private  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| msg | <code>Discord~Message</code> | The message that lead to this being called. |
+| id | <code>string</code> | The id of the guild this was triggered from. |
+
 <a name="HungryGames..nothing"></a>
 
 ### HungryGames~nothing() ⇒ <code>string</code> ℗
@@ -5051,6 +5091,29 @@ Get a random message of a given type from hgMessages.json.
 | --- | --- | --- |
 | type | <code>string</code> | The message type to get. |
 
+<a name="HungryGames..fetchCustomEvents"></a>
+
+### HungryGames~fetchCustomEvents(id, cb) ℗
+Fetch all events from the custom event ID list and cache them in memory.
+
+**Kind**: inner method of [<code>HungryGames</code>](#HungryGames)  
+**Access**: private  
+**Todo:**: Custom events are loaded into memory for every guild they are in.
+This is inefficient since multiple guilds may include the same event.
+Custom events should exist in memory at most 1 time.  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| id | <code>string</code> \| <code>number</code> | The ID of the guild to fetch custom events for. |
+| cb | <code>function</code> | The callback to call once complete. |
+
+<a name="HungryGames..fetchCustomEvents..done"></a>
+
+#### fetchCustomEvents~done() ℗
+Callback for each completed event load.
+
+**Kind**: inner method of [<code>fetchCustomEvents</code>](#HungryGames..fetchCustomEvents)  
+**Access**: private  
 <a name="HungryGames..find"></a>
 
 ### HungryGames~find(id) ⇒ [<code>GuildGame</code>](#HungryGames..GuildGame) ℗
@@ -5178,7 +5241,7 @@ Probabilities for each choosing an event with each type of outcome.
 <a name="HungryGames..GuildGame"></a>
 
 ### HungryGames~GuildGame : <code>Object</code>
-A singe instance of a game in a guild.
+A single instance of a game in a guild.
 
 **Kind**: inner typedef of [<code>HungryGames</code>](#HungryGames)  
 **Properties**
@@ -5190,7 +5253,10 @@ A singe instance of a game in a guild.
 | options | <code>Object.&lt;(number\|boolean\|string\|Object)&gt;</code> | The game options. |
 | autoPlay | <code>boolean</code> | Is the game currently autoplaying. |
 | excludedUsers | <code>Array.&lt;string&gt;</code> | The ids of the users to exclude from the games. |
-| customEvents | <code>Object</code> | All custom events for the guild. |
+| [legacyEvents] | <code>Object</code> | All custom events created prior to the ID system. |
+| disabledEvents | <code>Object</code> | All of the events that have been disabled for the guild. |
+| customEvents | <code>Object</code> | All custom events currently loaded into memory. |
+| customEventIds | <code>Object</code> | The IDs of all custom events to load for this guild. |
 | currentGame | [<code>Game</code>](#HungryGames..Game) | The current game in the guild. |
 
 <a name="HungryGames..Game"></a>
