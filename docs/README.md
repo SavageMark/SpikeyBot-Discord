@@ -2722,7 +2722,7 @@ Hunger Games simulator.
         * [.includeUsers(users, id)](#HungryGames+includeUsers) ⇒ <code>string</code>
         * [.setOption(id, option, value, [text])](#HungryGames+setOption) ⇒ <code>string</code>
         * [.editTeam(uId, gId, cmd, one, two)](#HungryGames+editTeam) ⇒ <code>string</code>
-        * [.makeAndAddEvent(id, type, message, numVictim, numAttacker, victimOutcome, attackerOutcome, victimKiller, attackerKiller, vWeapon, aWeapon)](#HungryGames+makeAndAddEvent) ⇒ <code>string</code>
+        * [.makeAndAddEvent(id, type, creator, message, numVictim, numAttacker, victimOutcome, attackerOutcome, victimKiller, attackerKiller, vWeapon, aWeapon)](#HungryGames+makeAndAddEvent) ⇒ <code>string</code>
         * [.addEvent(id, type, event)](#HungryGames+addEvent) ⇒ <code>string</code>
         * [.addMajorEvent(id, type, data, [name])](#HungryGames+addMajorEvent) ⇒ <code>string</code>
         * [.editMajorEvent(id, type, search, data, [name], [newName])](#HungryGames+editMajorEvent) ⇒ <code>string</code>
@@ -2750,7 +2750,17 @@ Hunger Games simulator.
         * [~Team](#HungryGames..Team)
             * [new Team(id, name, players)](#new_HungryGames..Team_new)
         * [~Event](#HungryGames..Event)
-            * [new Event(message, [numVictim], [numAttacker], [victimOutcome], [attackerOutcome], [victimKiller], [attackerKiller], [battle], [state], [attacks])](#new_HungryGames..Event_new)
+            * [new Event(message, [id], [type], [creator], [privacy], [numVictim], [numAttacker], [victimOutcome], [attackerOutcome], [victimKiller], [attackerKiller], [battle], [state], [attacks])](#new_HungryGames..Event_new)
+            * [.message](#HungryGames..Event+message) : <code>string</code>
+            * [.id](#HungryGames..Event+id) : <code>string</code>
+            * [.type](#HungryGames..Event+type) : <code>string</code>
+            * [.creator](#HungryGames..Event+creator) : <code>string</code> \| <code>number</code>
+            * [.privacy](#HungryGames..Event+privacy) : <code>string</code>
+            * [.victim](#HungryGames..Event+victim) : <code>Object</code>
+            * [.attacker](#HungryGames..Event+attacker) : <code>Object</code>
+            * [.battle](#HungryGames..Event+battle) : <code>boolean</code>
+            * [.state](#HungryGames..Event+state) : <code>number</code>
+            * [.attacks](#HungryGames..Event+attacks) : [<code>Array.&lt;Event&gt;</code>](#HungryGames..Event)
         * [~web](#HungryGames..web) : [<code>HGWeb</code>](#HGWeb) ℗
         * [~findTimestamps](#HungryGames..findTimestamps) : <code>Object.&lt;number&gt;</code> ℗
         * [~games](#HungryGames..games) : [<code>Object.&lt;GuildGame&gt;</code>](#HungryGames..GuildGame) ℗
@@ -3166,17 +3176,20 @@ Allows editing teams. Entry for all team actions.
 
 <a name="HungryGames+makeAndAddEvent"></a>
 
-### hungryGames.makeAndAddEvent(id, type, message, numVictim, numAttacker, victimOutcome, attackerOutcome, victimKiller, attackerKiller, vWeapon, aWeapon) ⇒ <code>string</code>
+### hungryGames.makeAndAddEvent(id, type, creator, message, numVictim, numAttacker, victimOutcome, attackerOutcome, victimKiller, attackerKiller, vWeapon, aWeapon) ⇒ <code>string</code>
 Creates an event and adds it to the custom events for the given guild.
 
 **Kind**: instance method of [<code>HungryGames</code>](#HungryGames)  
 **Returns**: <code>string</code> - Error message or null if no error.  
 **Access**: public  
+**Todo:**: Creator ID is not validated anywhere. There is no guarantee that the
+ID is an actual user.  
 
 | Param | Type | Description |
 | --- | --- | --- |
 | id | <code>string</code> | The guild id to add the event to. |
 | type | <code>string</code> | The type of event this is. Either 'player' or 'bloodbath'. |
+| creator | <code>string</code> \| <code>number</code> | The ID of the user creating this event. |
 | message | <code>string</code> | The event message. |
 | numVictim | <code>number</code> | The number of victims in the event. |
 | numAttacker | <code>number</code> | The number of attackers in the event. |
@@ -3253,7 +3266,7 @@ events. (Bloodbath or Player events)
 | --- | --- | --- |
 | id | <code>string</code> | The id of the guild to remove the event from. |
 | type | <code>string</code> | The type of event this is. |
-| event | [<code>Event</code>](#HungryGames..Event) | The event to search for. |
+| event | [<code>Event</code>](#HungryGames..Event) \| <code>string</code> | The event to search for, or the ID of the event. |
 
 <a name="HungryGames+toggleEvent"></a>
 
@@ -3530,24 +3543,34 @@ Event that can happen in a game.
 
 | Name | Type | Description |
 | --- | --- | --- |
-| message | <code>string</code> | The message to show. |
 | [action] | <code>string</code> | The action to format into a message if this is a weapon event. |
-| victim | <code>Object</code> | Information about the victims in this event. |
-| attacker | <code>Object</code> | Information about the attackers in this event. |
-| victim.weapon | <code>Object</code> | The weapon information to give to the player. |
-| attacker.weapon | <code>Object</code> | The weapon information to give to the player. |
-| battle | <code>boolean</code> | Is this event a battle event. |
-| state | <code>number</code> | The current state of printing the battle messages. |
-| attacks | [<code>Array.&lt;Event&gt;</code>](#HungryGames..Event) | The attacks in a battle to show before the message. |
 | [consumes] | <code>number</code> \| <code>string</code> | Amount of consumables used if this is a weapon event. |
+
+
+* [~Event](#HungryGames..Event)
+    * [new Event(message, [id], [type], [creator], [privacy], [numVictim], [numAttacker], [victimOutcome], [attackerOutcome], [victimKiller], [attackerKiller], [battle], [state], [attacks])](#new_HungryGames..Event_new)
+    * [.message](#HungryGames..Event+message) : <code>string</code>
+    * [.id](#HungryGames..Event+id) : <code>string</code>
+    * [.type](#HungryGames..Event+type) : <code>string</code>
+    * [.creator](#HungryGames..Event+creator) : <code>string</code> \| <code>number</code>
+    * [.privacy](#HungryGames..Event+privacy) : <code>string</code>
+    * [.victim](#HungryGames..Event+victim) : <code>Object</code>
+    * [.attacker](#HungryGames..Event+attacker) : <code>Object</code>
+    * [.battle](#HungryGames..Event+battle) : <code>boolean</code>
+    * [.state](#HungryGames..Event+state) : <code>number</code>
+    * [.attacks](#HungryGames..Event+attacks) : [<code>Array.&lt;Event&gt;</code>](#HungryGames..Event)
 
 <a name="new_HungryGames..Event_new"></a>
 
-#### new Event(message, [numVictim], [numAttacker], [victimOutcome], [attackerOutcome], [victimKiller], [attackerKiller], [battle], [state], [attacks])
+#### new Event(message, [id], [type], [creator], [privacy], [numVictim], [numAttacker], [victimOutcome], [attackerOutcome], [victimKiller], [attackerKiller], [battle], [state], [attacks])
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
 | message | <code>string</code> |  | The message to show. |
+| [id] | <code>string</code> |  | The ID of this event. |
+| [type] | <code>string</code> | <code>&quot;&#x27;normal&#x27;&quot;</code> | The event type. |
+| [creator] | <code>string</code> \| <code>number</code> |  | The ID of the user who created this event. |
+| [privacy] | <code>string</code> | <code>&quot;&#x27;private&#x27;&quot;</code> | Privacy of this event. `public`, `unlisted`, or `private`. |
 | [numVictim] | <code>number</code> | <code>0</code> | The number of victims in this event. |
 | [numAttacker] | <code>number</code> | <code>0</code> | The number of attackers in this event. |
 | [victimOutcome] | <code>string</code> | <code>&quot;nothing&quot;</code> | The outcome of the victims from this event. |
@@ -3558,6 +3581,91 @@ Event that can happen in a game.
 | [state] | <code>number</code> | <code>0</code> | State of event if there are multiple attacks before the event. |
 | [attacks] | [<code>Array.&lt;Event&gt;</code>](#HungryGames..Event) | <code>[]</code> | Array of attacks that take place before the event. |
 
+<a name="HungryGames..Event+message"></a>
+
+#### event.message : <code>string</code>
+The message to show.
+
+**Kind**: instance property of [<code>Event</code>](#HungryGames..Event)  
+**Access**: public  
+<a name="HungryGames..Event+id"></a>
+
+#### event.id : <code>string</code>
+The ID of this event. Combination of the creator's ID, the timestamp of
+creation, and a few random characters.
+
+**Kind**: instance property of [<code>Event</code>](#HungryGames..Event)  
+**Access**: public  
+<a name="HungryGames..Event+type"></a>
+
+#### event.type : <code>string</code>
+The type of event this is. `normal`, `arena`, or `weapon`.
+
+**Kind**: instance property of [<code>Event</code>](#HungryGames..Event)  
+**Access**: public  
+<a name="HungryGames..Event+creator"></a>
+
+#### event.creator : <code>string</code> \| <code>number</code>
+The ID of the user who created this event.
+
+**Kind**: instance property of [<code>Event</code>](#HungryGames..Event)  
+**Access**: public  
+<a name="HungryGames..Event+privacy"></a>
+
+#### event.privacy : <code>string</code>
+The privacy setting of this event. This must be identical to the value
+stored in the database. `public`, `unlisted`, or `private`.
+
+**Kind**: instance property of [<code>Event</code>](#HungryGames..Event)  
+**Default**: <code>&quot;&#x27;private&#x27;&quot;</code>  
+**Access**: public  
+<a name="HungryGames..Event+victim"></a>
+
+#### event.victim : <code>Object</code>
+Information about the victims in this event.
+
+**Kind**: instance property of [<code>Event</code>](#HungryGames..Event)  
+**Access**: public  
+**Properties**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| weapon | <code>Object</code> | The weapon information to give to the player. |
+
+<a name="HungryGames..Event+attacker"></a>
+
+#### event.attacker : <code>Object</code>
+Information about the attackers in this event.
+
+**Kind**: instance property of [<code>Event</code>](#HungryGames..Event)  
+**Access**: public  
+**Properties**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| weapon | <code>Object</code> | The weapon information to give to the player. |
+
+<a name="HungryGames..Event+battle"></a>
+
+#### event.battle : <code>boolean</code>
+Is this event a battle event.
+
+**Kind**: instance property of [<code>Event</code>](#HungryGames..Event)  
+**Access**: public  
+<a name="HungryGames..Event+state"></a>
+
+#### event.state : <code>number</code>
+The current state of printing the battle messages.
+
+**Kind**: instance property of [<code>Event</code>](#HungryGames..Event)  
+**Access**: public  
+<a name="HungryGames..Event+attacks"></a>
+
+#### event.attacks : [<code>Array.&lt;Event&gt;</code>](#HungryGames..Event)
+The attacks in a battle to show before the message.
+
+**Kind**: instance property of [<code>Event</code>](#HungryGames..Event)  
+**Access**: public  
 <a name="HungryGames..web"></a>
 
 ### HungryGames~web : [<code>HGWeb</code>](#HGWeb) ℗

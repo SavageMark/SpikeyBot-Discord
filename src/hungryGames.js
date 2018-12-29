@@ -1137,11 +1137,6 @@ function HungryGames() {
       let game = find(g.id);
       if (!game) return;
 
-      if (game.customEvents) {
-        game.legacyEvents = game.customEvents;
-        delete game.customEvents;
-      }
-
       if (game.currentGame && game.currentGame.day.state > 1 &&
           game.currentGame.inProgress && !game.currentGame.ended) {
         self.nextDay(game.author, g.id, game.outputChannel);
@@ -1384,6 +1379,11 @@ function HungryGames() {
    * @class
    *
    * @param {string} message The message to show.
+   * @param {string} [id] The ID of this event.
+   * @param {string} [type='normal'] The event type.
+   * @param {string|number} [creator] The ID of the user who created this event.
+   * @param {string} [privacy='private'] Privacy of this event. `public`,
+   * `unlisted`, or `private`.
    * @param {number} [numVictim=0] The number of victims in this event.
    * @param {number} [numAttacker=0] The number of attackers in this event.
    * @param {string} [victimOutcome=nothing] The outcome of the victims from
@@ -1399,43 +1399,119 @@ function HungryGames() {
    * before the event.
    * @param {HungryGames~Event[]} [attacks=[]] Array of attacks that take place
    * before the event.
-   * @property {string} message The message to show.
    * @property {string} [action] The action to format into a message if this is
    * a weapon event.
-   * @property {{count: number, outcome: string, killer: boolean, weapon:
-   * ?Object}} victim Information about the victims in this event.
-   * @property {{count: number, outcome: string, killer: boolean, weapon:
-   * ?Object}} attacker Information about the attackers in this event.
-   * @property {{name: string, count: number}} victim.weapon The weapon
-   * information to give to the player.
-   * @property {{name: string, count: number}} attacker.weapon The weapon
-   * information to give to the player.
-   * @property {boolean} battle Is this event a battle event.
-   * @property {number} state The current state of printing the battle messages.
-   * @property {HungryGames~Event[]} attacks The attacks in a battle to show
-   * before the message.
    * @property {number|string} [consumes] Amount of consumables used if this is
    * a weapon event.
    */
   function Event(
-      message, numVictim = 0, numAttacker = 0, victimOutcome = 'nothing',
-      attackerOutcome = 'nothing', victimKiller = false, attackerKiller = false,
-      battle = false, state = 0, attacks = []) {
+      message, id, type, creator, privacy, numVictim = 0, numAttacker = 0,
+      victimOutcome = 'nothing', attackerOutcome = 'nothing',
+      victimKiller = false, attackerKiller = false, battle = false, state = 0,
+      attacks = []) {
+    /**
+     * The message to show.
+     * @public
+     * @type {string} message
+     */
     this.message = message;
+
+    if (!id || !id.match(/^\d+\/\d+-\w+$/)) {
+      let rand = Math.floor((Math.random() * Math.pow(36, 6))).toString(36);
+      id = `${creator}/${Date.now()}-${rand}`;
+    }
+    /**
+     * The ID of this event. Combination of the creator's ID, the timestamp of
+     * creation, and a few random characters.
+     * @public
+     * @type {string}
+     */
+    this.id = id;
+    switch (type) {
+      case 'normal':
+      case 'arena':
+      case 'weapon':
+        break;
+      default:
+        type = 'normal';
+        break;
+    }
+    /**
+     * The type of event this is. `normal`, `arena`, or `weapon`.
+     * @public
+     * @type {string}
+     */
+    this.type = type;
+    /**
+     * The ID of the user who created this event.
+     * @public
+     * @type {?string|number}
+     */
+    this.creator = creator;
+    switch (privacy) {
+      case 'public':
+      case 'unlisted':
+      case 'private':
+        break;
+      default:
+        privacy = 'private';
+        break;
+    }
+    /**
+     * The privacy setting of this event. This must be identical to the value
+     * stored in the database. `public`, `unlisted`, or `private`.
+     * @public
+     * @type {string}
+     * @default 'private'
+     */
+    this.privacy = privacy;
+    /**
+     * Information about the victims in this event.
+     * @public
+     * @type {
+     *   {count: number, outcome: string, killer: boolean, weapon: ?Object}
+     * }
+     * @property {{name: string, count: number}} weapon The weapon information
+     * to give to the player.
+     */
     this.victim = {
       count: numVictim,
       outcome: victimOutcome,
       killer: victimKiller,
       weapon: null,
     };
+    /**
+     * Information about the attackers in this event.
+     * @public
+     * @type {
+     *   {count: number, outcome: string, killer: boolean, weapon: ?Object}
+     * }
+     * @property {{name: string, count: number}} weapon The weapon information
+     * to give to the player.
+     */
     this.attacker = {
       count: numAttacker,
       outcome: attackerOutcome,
       killer: attackerKiller,
       weapon: null,
     };
+    /**
+     * Is this event a battle event.
+     * @public
+     * @type {boolean}
+     */
     this.battle = battle;
+    /**
+     * The current state of printing the battle messages.
+     * @public
+     * @type {number}
+     */
     this.state = state;
+    /**
+     * The attacks in a battle to show before the message.
+     * @public
+     * @type {HungryGames~Event[]}
+     */
     this.attacks = attacks;
   }
   this.Event = Event;
@@ -6013,8 +6089,8 @@ function HungryGames() {
           finish = function() {
             msg_.delete().catch(() => {});
             let error = self.makeAndAddEvent(
-                id, eventType, message, numVictim, numAttacker, victimOutcome,
-                attackerOutcome, victimKiller, attackerKiller);
+                id, eventType, authId, message, numVictim, numAttacker,
+                victimOutcome, attackerOutcome, victimKiller, attackerKiller);
             if (error) {
               msg.channel.send(
                   '`Failed to create event!`\n' + eventType + ' event\n' +
@@ -6024,8 +6100,9 @@ function HungryGames() {
                   '`Event created!`\n' +
                   formatEventString(
                       new Event(
-                          message, numVictim, numAttacker, victimOutcome,
-                          attackerOutcome, victimKiller, attackerKiller)) +
+                          message, null, null, authId, null, numVictim,
+                          numAttacker, victimOutcome, attackerOutcome,
+                          victimKiller, attackerKiller)) +
                   '\n' + eventType + ' event');
             }
           };
@@ -6043,11 +6120,14 @@ function HungryGames() {
 
   /**
    * Creates an event and adds it to the custom events for the given guild.
+   * @TODO: Creator ID is not validated anywhere. There is no guarantee that the
+   * ID is an actual user.
    *
    * @public
    * @param {string} id The guild id to add the event to.
    * @param {string} type The type of event this is. Either 'player' or
    * 'bloodbath'.
+   * @param {string|number} creator The ID of the user creating this event.
    * @param {string} message The event message.
    * @param {number} numVictim The number of victims in the event.
    * @param {number} numAttacker The number of attackers in the event.
@@ -6063,15 +6143,16 @@ function HungryGames() {
    * @return {?string} Error message or null if no error.
    */
   this.makeAndAddEvent = function(
-      id, type, message, numVictim, numAttacker, victimOutcome, attackerOutcome,
-      victimKiller, attackerKiller, vWeapon = null, aWeapon = null) {
+      id, type, creator, message, numVictim, numAttacker, victimOutcome,
+      attackerOutcome, victimKiller, attackerKiller, vWeapon = null,
+      aWeapon = null) {
     if (type !== 'player' && type !== 'bloodbath') return 'Invalid Type';
-    if (!find(id) || !find(id).customEvents) {
-      return 'Invalid ID or no game.';
+    if (!find(id) || !find(id).customEventIds) {
+      createGame(id, null, true);
     }
     let newEvent = new Event(
-        message, numVictim, numAttacker, victimOutcome, attackerOutcome,
-        victimKiller, attackerKiller);
+        message, null, 'normal', creator, null, numVictim, numAttacker,
+        victimOutcome, attackerOutcome, victimKiller, attackerKiller);
     if (vWeapon) {
       newEvent.victim.weapon = vWeapon;
     }
@@ -6091,18 +6172,67 @@ function HungryGames() {
    */
   this.addEvent = function(id, type, event) {
     if (type !== 'bloodbath' && type !== 'player') return 'Invalid Type';
-    if (!find(id) || !find(id).customEvents) {
+    if (!find(id) || !find(id).customEventIds) {
       return 'Invalid ID or no game.';
     }
     if (!event.message || event.message.length == 0) {
       return 'Event must have a message.';
+    }
+    if (!event.creator) {
+      return 'Event must have a creator.';
+    }
+    if (!event.id || event.id.indexOf(event.creator) != 0 ||
+        !id.match(/^\d+\/\d+-\w+$/)) {
+      return 'Event must have an valid ID.';
+    }
+    if (!event.type) {
+      return 'Event must have a valid type.';
     }
     for (let i in find(id).customEvents[type]) {
       if (self.eventsEqual(event, find(id).customEvents[type][i])) {
         return 'Event already exists!';
       }
     }
-    find(id).customEvents[type].push(event);
+    mkdirp(eventDir + event.creator, (err) => {
+      if (err) {
+        self.error('Failed to create directory: ' + eventDir + event.creator);
+        console.error(err);
+        return;
+      }
+      fs.writeFile(
+          eventDir + event.id + '.json', JSON.stringify(event), (err) => {
+            if (err) {
+              self.error(
+                  'Failed to write custom event to file: ' + eventDir +
+                  event.id + '.json');
+              console.error(err);
+              return;
+            }
+            let toSend = sqlCon.format(
+                'INSERT INTO HGEvents (Id, CreatorId, DateCreated, Privacy, ' +
+                    'EventType) VALUES (?, ?, FROM_UNIXTIME(?), "private", ?)',
+                [
+                  event.id, event.creator, event.id.match(/\/(\d+)-/),
+                  event.type,
+                ]);
+            sqlCon.query(toSend, (err) => {
+              if (err) {
+                self.error(
+                    'Failed to put custom event into SQL database: ' + toSend);
+                console.error(err);
+                fs.unlink(eventDir + event.id + '.json', (err) => {
+                  if (!err) return;
+                  self.error(
+                      'FAILED TO CLEAN UP AFTER ERROR. UNABLE TO UNLINK ' +
+                      'HANGING FILE: ' + eventDir + event.id + '.json');
+                });
+                return;
+              }
+              find(id).customEventIds[type].push(id);
+              find(id).customEvents[type].push(event);
+            });
+          });
+    });
     return null;
   };
 
@@ -6269,22 +6399,56 @@ function HungryGames() {
    * @public
    * @param {string} id The id of the guild to remove the event from.
    * @param {string} type The type of event this is.
-   * @param {HungryGames~Event} event The event to search for.
+   * @param {HungryGames~Event|string} event The event to search for, or the ID
+   * of the event.
    * @return {?string} Error message or null if no error.
    */
   this.removeEvent = function(id, type, event) {
     if (type !== 'bloodbath' && type !== 'player') return 'Invalid Type';
-    if (!find(id) || !find(id).customEvents) {
+    if (!find(id) || !find(id).customEventIds) {
       return 'Invalid ID or no game.';
     }
-    let list = find(id).customEvents[type];
+
+    let list = find(id).customEventIds[type];
+    let eId = event.id || event;
+    let isObj = (event && true) || false;
+    let success = false;
     for (let i in list) {
-      if (self.eventsEqual(list[i], event)) {
+      if (list[i] == eId) {
         list.splice(i, 1);
-        return null;
+        success = true;
+        break;
       }
     }
-    return 'Failed to find event to remove.';
+
+    let toSend =
+        sqlCon.format('DELETE FROM HGEvents WHERE Id=? LIMIT 1', [event.id]);
+    sqlCon.query(toSend, (err) => {
+      if (err) {
+        self.error(
+            'Failed to remove custom event from SQL database: ' + toSend);
+        console.error(err);
+        return;
+      }
+    });
+
+    if (find(id).customEvents) {
+      list = find(id).customEvents[type];
+      for (let i in list) {
+        if (isObj) {
+          if (self.eventsEqual(list[i], event)) {
+            list.splice(i, 1);
+            break;
+          }
+        } else {
+          if (list[i].id == eId) {
+            list.splice(i, 1);
+            break;
+          }
+        }
+      }
+    }
+    return success ? null : 'Failed to find event to remove.';
   };
 
   /**
@@ -6726,6 +6890,7 @@ function HungryGames() {
               eventType = 'bloodbath';
             }
 
+            let evt;
             if (eventType == 'player') {
               if (num >= find(id).customEvents.player.length) {
                 self.common.reply(
@@ -6734,10 +6899,7 @@ function HungryGames() {
                         'one.');
                 msg_.delete().catch(() => {});
               } else {
-                const removed = find(id).customEvents.player.splice(num, 1)[0];
-                self.common.reply(
-                    msg, 'Removed event.', formatEventString(removed, true));
-                msg_.delete().catch(() => {});
+                evt = find(id).customEvents.player[num];
               }
             } else {
               if (num >= find(id).customEvents.bloodbath.length) {
@@ -6747,12 +6909,12 @@ function HungryGames() {
                         'one.');
                 msg_.delete().catch(() => {});
               } else {
-                const removed =
-                    find(id).customEvents.bloodbath.splice(num, 1)[0];
-                self.common.reply(
-                    msg, 'Removed event.', formatEventString(removed, true));
-                msg_.delete().catch(() => {});
+                evt = find(id).customEvents.bloodbath[num];
               }
+              self.removeEvent(id, eventType, evt);
+              self.common.reply(
+                  msg, 'Removed event.', formatEventString(removed, true));
+              msg_.delete().catch(() => {});
             }
           });
 
@@ -7320,10 +7482,6 @@ function HungryGames() {
           evt.creator = ownerId;
           evt.privacy = 'private';
 
-          let toSend = sqlCon.format(
-              'INSERT INTO HGEvents (Id, CreatorId, DateCreated, Privacy, ' +
-                  'EventType) VALUES (?, ?, FROM_UNIXTIME(?), "private", ?)',
-              [id, ownerId, now / 1000, type]);
           fs.writeFile(eventDir + id + '.json', JSON.stringify(evt), (err) => {
             if (err) {
               self.error(
@@ -7334,6 +7492,10 @@ function HungryGames() {
               done();
               return;
             }
+            let toSend = sqlCon.format(
+                'INSERT INTO HGEvents (Id, CreatorId, DateCreated, Privacy, ' +
+                    'EventType) VALUES (?, ?, FROM_UNIXTIME(?), "private", ?)',
+                [id, ownerId, now / 1000, type]);
             sqlCon.query(toSend, (err) => {
               if (err) {
                 self.error(
@@ -7345,7 +7507,7 @@ function HungryGames() {
                   if (!err) return;
                   self.error(
                       'FAILED TO CLEAN UP AFTER ERROR. UNABLE TO UNLINK ' +
-                      'HANGING FILE: ' + evnetDir + id + '.json');
+                      'HANGING FILE: ' + eventDir + id + '.json');
                 });
                 return;
               }
@@ -7626,6 +7788,11 @@ function HungryGames() {
       // File probably doesn't exist.
       // TODO: Log if something goes wrong other than file not existing.
       return null;
+    }
+
+    if (games[id].customEvents) {
+      games[id].legacyEvents = games[id].customEvents;
+      delete games[id].customEvents;
     }
 
     // Flush default and stale options.

@@ -1108,8 +1108,8 @@ function HGWeb(hg) {
       replyNoPerm(socket, 'createEvent');
       return;
     }
-    let err =
-        hg.makeAndAddEvent(gId, type, message, nV, nA, oV, oA, kV, kA, wV, wA);
+    let err = hg.makeAndAddEvent(
+        gId, type, userData.id, message, nV, nA, oV, oA, kV, kA, wV, wA);
     if (err) {
       if (typeof cb === 'function') cb('ATTEMPT_FAILED');
       socket.emit('message', 'Failed to create event: ' + err);
