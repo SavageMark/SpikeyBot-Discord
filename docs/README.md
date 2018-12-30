@@ -2722,6 +2722,7 @@ Hunger Games simulator.
         * [.includeUsers(users, id)](#HungryGames+includeUsers) ⇒ <code>string</code>
         * [.setOption(id, option, value, [text])](#HungryGames+setOption) ⇒ <code>string</code>
         * [.editTeam(uId, gId, cmd, one, two)](#HungryGames+editTeam) ⇒ <code>string</code>
+        * [.deleteEvent(id, cb)](#HungryGames+deleteEvent)
         * [.makeAndAddEvent(id, type, creator, message, numVictim, numAttacker, victimOutcome, attackerOutcome, victimKiller, attackerKiller, vWeapon, aWeapon)](#HungryGames+makeAndAddEvent) ⇒ <code>string</code>
         * [.addEvent(id, type, event)](#HungryGames+addEvent) ⇒ <code>string</code>
         * [.addMajorEvent(id, type, data, [name])](#HungryGames+addMajorEvent) ⇒ <code>string</code>
@@ -3173,6 +3174,19 @@ Allows editing teams. Entry for all team actions.
 | cmd | <code>string</code> | The command to run on the teams. |
 | one | <code>string</code> | The id of the user to swap, or the new name of the team if we're renaming a team. |
 | two | <code>string</code> | The id of the user to swap, or the team id if we're moving a player to a team. |
+
+<a name="HungryGames+deleteEvent"></a>
+
+### hungryGames.deleteEvent(id, cb)
+Delete a custom event.
+
+**Kind**: instance method of [<code>HungryGames</code>](#HungryGames)  
+**Access**: public  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| id | <code>string</code> | The ID of the event to delete. |
+| cb | <code>basicCB</code> | Callback with single parameter, true if error, false if success. |
 
 <a name="HungryGames+makeAndAddEvent"></a>
 

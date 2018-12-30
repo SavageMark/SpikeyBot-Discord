@@ -6119,6 +6119,38 @@ function HungryGames() {
   }
 
   /**
+   * Delete a custom event.
+   * @public
+   *
+   * @param {string} id The ID of the event to delete.
+   * @param {basicCB} cb Callback with single parameter, true if error, false if
+   * success.
+   */
+  this.deleteEvent = function(id, cb) {
+    if (!id || !id.match(/^\d+\/\d+-\w+$/)) {
+      self.error('Invalid ID format of custom event to delete: ' + id);
+      cb(true);
+      return;
+    }
+    fs.unlink(eventDir + id + '.json', (err) => {
+      if (err) {
+        cb(true);
+        return;
+      }
+      let toSend =
+          sqlCon.format('DELETE FROM HGEvents WHERE Id=? LIMIT 1', [id]);
+      sqlCon.query(toSend, (err) => {
+        if (err) {
+          self.error(
+              'Failed to remove custom event from SQL database: ' + toSend);
+          console.error(err);
+        }
+        cb(false);
+      });
+    });
+  };
+
+  /**
    * Creates an event and adds it to the custom events for the given guild.
    * @TODO: Creator ID is not validated anywhere. There is no guarantee that the
    * ID is an actual user.
@@ -6314,7 +6346,7 @@ function HungryGames() {
    */
   this.editMajorEvent = function(id, type, search, data, name, newName) {
     if (type !== 'arena' && type !== 'weapon') return 'Invalid Type';
-    if (!find(id) || !find(id).customEvents) {
+    if (!find(id) || !find(id).customEventIds) {
       return 'Invalid ID or no game.';
     }
     let list = find(id).customEvents[type];
@@ -6420,17 +6452,6 @@ function HungryGames() {
         break;
       }
     }
-
-    let toSend =
-        sqlCon.format('DELETE FROM HGEvents WHERE Id=? LIMIT 1', [event.id]);
-    sqlCon.query(toSend, (err) => {
-      if (err) {
-        self.error(
-            'Failed to remove custom event from SQL database: ' + toSend);
-        console.error(err);
-        return;
-      }
-    });
 
     if (find(id).customEvents) {
       list = find(id).customEvents[type];
