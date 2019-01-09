@@ -202,6 +202,25 @@ function HungryGames() {
   const findDelay = 15000;
 
   /**
+   * Checks that the entire string is the ID with nothing extra.
+   *
+   * @private
+   * @type {RegExp}
+   * @constant
+   * @default
+   */
+  const exactEventIdRegex = /^\d+\/\d+-\w+$/;
+  /**
+   * Checks that the string contains the ID.
+   *
+   * @private
+   * @type {RegExp}
+   * @constant
+   * @default
+   */
+  // const eventIdRegex = /\d+\/\d+-\w+/;
+
+  /**
    * Default options for a game.
    *
    * @private
@@ -1416,7 +1435,7 @@ function HungryGames() {
      */
     this.message = message;
 
-    if (!id || !id.match(/^\d+\/\d+-\w+$/)) {
+    if (!id || !id.match(exactEventIdRegex)) {
       let rand = Math.floor((Math.random() * Math.pow(36, 6))).toString(36);
       id = `${creator}/${Date.now()}-${rand}`;
     }
@@ -5952,7 +5971,8 @@ function HungryGames() {
 
   // Game Events //
   /**
-   * Create a custom event for a guild.
+   * Create a custom event for a user and guild, or add an existing event to the
+   * guild.
    *
    * @private
    * @type {HungryGames~hgCommandHandler}
@@ -5991,7 +6011,7 @@ function HungryGames() {
           let attackerOutcome = 'nothing';
           let victimKiller = false;
           let attackerKiller = false;
-          getAttackNum = function() {
+          let getAttackNum = function() {
             createEventNums(
                 msg_, authId,
                 '`How many attackers may be in this event? (-1 means at ' +
@@ -6006,7 +6026,7 @@ function HungryGames() {
                   msg_.delete().catch(() => {});
                 });
           };
-          getVictimNum = function() {
+          let getVictimNum = function() {
             createEventNums(
                 msg_, authId,
                 '`How many victims may be in this event? (-1 means at least ' +
@@ -6021,7 +6041,7 @@ function HungryGames() {
                   msg_.delete().catch(() => {});
                 });
           };
-          getAttackOutcome = function() {
+          let getAttackOutcome = function() {
             if (numAttacker == 0) {
               getVictimOutcome();
             } else {
@@ -6038,7 +6058,7 @@ function HungryGames() {
                   });
             }
           };
-          getVictimOutcome = function() {
+          let getVictimOutcome = function() {
             if (numVictim == 0) {
               getIsAttackerKiller();
             } else {
@@ -6055,7 +6075,7 @@ function HungryGames() {
                   });
             }
           };
-          getIsAttackerKiller = function() {
+          let getIsAttackerKiller = function() {
             if (numAttacker == 0) {
               getIsVictimKiller();
             } else {
@@ -6073,7 +6093,7 @@ function HungryGames() {
                   });
             }
           };
-          getIsVictimKiller = function() {
+          let getIsVictimKiller = function() {
             if (numVictim == 0) {
               finish();
             } else {
@@ -6086,7 +6106,7 @@ function HungryGames() {
                   });
             }
           };
-          finish = function() {
+          let finish = function() {
             msg_.delete().catch(() => {});
             let error = self.makeAndAddEvent(
                 id, eventType, authId, message, numVictim, numAttacker,
@@ -6119,7 +6139,7 @@ function HungryGames() {
   }
 
   /**
-   * Delete a custom event.
+   * Delete a custom event from a user's profile.
    * @public
    *
    * @param {string} id The ID of the event to delete.
@@ -6127,7 +6147,7 @@ function HungryGames() {
    * success.
    */
   this.deleteEvent = function(id, cb) {
-    if (!id || !id.match(/^\d+\/\d+-\w+$/)) {
+    if (!id || !id.match(exactEventIdRegex)) {
       self.error('Invalid ID format of custom event to delete: ' + id);
       cb(true);
       return;
@@ -6191,7 +6211,111 @@ function HungryGames() {
     if (aWeapon) {
       newEvent.attacker.weapon = aWeapon;
     }
+    self.saveEvent(id, type, newEvent);
     return self.addEvent(id, type, newEvent);
+  };
+
+  /**
+   * Adds a given event to a user's custom events. If it already exists, it will
+   * override the existing file. Relies on the ID in `event` and `creator` in
+   * `event` to be accurate.
+   *
+   * @public
+   * @param {string} type The type of event this is.
+   * @param {HungryGames~Event} event The event to add.
+   * @param {basicCB} cb Callback to fire when the operation is complete. Single
+   * argument, string if error, or null if none.
+   */
+  this.saveEvent = function(type, event, cb) {
+    const checkQuery =
+        sqlCon.format('SELECT FROM HGEvents WHERE Id=? LIMIT 1', [
+          event.id,
+        ]);
+    sqlCon.query(checkQuery, (err, rows) => {
+      if (err) {
+        self.error(
+            'Failed to check if event exists in database: ' + checkQuery);
+        console.error(err);
+        cb('Internal Error');
+        return;
+      }
+      /**
+       * Write the event to file.
+       *
+       * @private
+       * @param {function} next Function to call if succeeded.
+       */
+      function write(next) {
+        fs.writeFile(
+            eventDir + event.id + '.json', JSON.stringify(event), (err) => {
+              if (err) {
+                self.error(
+                    'Failed to write custom event to file: ' + eventDir +
+                    event.id + '.json');
+                console.error(err);
+                cb('Internal Error');
+                return;
+              }
+              next();
+            });
+      }
+      if (!rows || rows.length == 0) {
+        // Event does not yet exist, create it.
+        mkdirp(eventDir + event.creator, (err) => {
+          if (err) {
+            self.error(
+                'Failed to create directory: ' + eventDir + event.creator);
+            console.error(err);
+            cb('Internal Error');
+            return;
+          }
+          write(() => {
+            const toSend = sqlCon.format(
+                'INSERT INTO HGEvents (Id, CreatorId, DateCreated, Privacy,' +
+                    ' EventType) VALUES (?, ?, FROM_UNIXTIME(?), "private", ?)',
+                [
+                  event.id,
+                  event.creator,
+                  event.id.match(/\/(\d+)-/),
+                  event.type,
+                ]);
+            sqlCon.query(
+                toSend, (err) => {
+                  if (err) {
+                    self.error(
+                        'Failed to put custom event into SQL database: ' +
+                        toSend);
+                    console.error(err);
+                    fs.unlink(eventDir + event.id + '.json', (err) => {
+                      if (!err) return;
+                      self.error(
+                          'FAILED TO CLEAN UP AFTER ERROR. UNABLE TO UNLINK ' +
+                          'HANGING FILE: ' + eventDir + event.id + '.json');
+                    });
+                    cb('Internal Error');
+                    return;
+                  }
+                });
+          });
+        });
+      } else {
+        // Event already exists, overwrite it.
+        write(() => {
+          const toSend =
+              sqlCon.format('UPDATE HGEvents WHERE id=?', [event.id]);
+          sqlCon.query(toSend, (err) => {
+            if (err) {
+              self.error(
+                  'Failed to update last modified timestamp in database: ' +
+                  toSend);
+              console.error(err);
+            }
+            self.logDebug('Updated custom event: ' + event.id);
+            cb(null);
+          });
+        });
+      }
+    });
   };
   /**
    * Adds a given event to the given guild's custom events.
@@ -6214,10 +6338,10 @@ function HungryGames() {
       return 'Event must have a creator.';
     }
     if (!event.id || event.id.indexOf(event.creator) != 0 ||
-        !id.match(/^\d+\/\d+-\w+$/)) {
-      return 'Event must have an valid ID.';
+        !id.match(exactEventIdRegex)) {
+      return 'Event must have a valid ID.';
     }
-    if (!event.type) {
+    if (!event.type || event.type.length < 5) {
       return 'Event must have a valid type.';
     }
     for (let i in find(id).customEvents[type]) {
@@ -6225,46 +6349,8 @@ function HungryGames() {
         return 'Event already exists!';
       }
     }
-    mkdirp(eventDir + event.creator, (err) => {
-      if (err) {
-        self.error('Failed to create directory: ' + eventDir + event.creator);
-        console.error(err);
-        return;
-      }
-      fs.writeFile(
-          eventDir + event.id + '.json', JSON.stringify(event), (err) => {
-            if (err) {
-              self.error(
-                  'Failed to write custom event to file: ' + eventDir +
-                  event.id + '.json');
-              console.error(err);
-              return;
-            }
-            let toSend = sqlCon.format(
-                'INSERT INTO HGEvents (Id, CreatorId, DateCreated, Privacy, ' +
-                    'EventType) VALUES (?, ?, FROM_UNIXTIME(?), "private", ?)',
-                [
-                  event.id, event.creator, event.id.match(/\/(\d+)-/),
-                  event.type,
-                ]);
-            sqlCon.query(toSend, (err) => {
-              if (err) {
-                self.error(
-                    'Failed to put custom event into SQL database: ' + toSend);
-                console.error(err);
-                fs.unlink(eventDir + event.id + '.json', (err) => {
-                  if (!err) return;
-                  self.error(
-                      'FAILED TO CLEAN UP AFTER ERROR. UNABLE TO UNLINK ' +
-                      'HANGING FILE: ' + eventDir + event.id + '.json');
-                });
-                return;
-              }
-              find(id).customEventIds[type].push(id);
-              find(id).customEvents[type].push(event);
-            });
-          });
-    });
+    find(id).customEventIds[type].push(event.id);
+    find(id).customEvents[type].push(event);
     return null;
   };
 
@@ -6426,7 +6512,7 @@ function HungryGames() {
 
   /**
    * Searches custom events for the given one, then removes it from the custom
-   * events. (Bloodbath or Player events)
+   * events on a guild. (Bloodbath or Player events)
    *
    * @public
    * @param {string} id The id of the guild to remove the event from.
@@ -6489,6 +6575,8 @@ function HungryGames() {
   /**
    * Enable or disable an event without deleting it completely.
    * @public
+   * @TODO: Update this to use the ID system. Requires giving IDs to all Major
+   * events as well.
    *
    * @param {number|string} id The guild id that the event shall be toggled in.
    * @param {string} type The type of event. 'bloodbath', 'player', 'weapon', or
@@ -6585,7 +6673,7 @@ function HungryGames() {
   };
 
   /**
-   * Checks if the two given events are equivalent.
+   * Checks if the two given events are equivalent. Ignores the event ID.
    *
    * @param {HungryGames~Event} e1
    * @param {HungryGames~Event} e2

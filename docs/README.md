@@ -2724,6 +2724,7 @@ Hunger Games simulator.
         * [.editTeam(uId, gId, cmd, one, two)](#HungryGames+editTeam) ⇒ <code>string</code>
         * [.deleteEvent(id, cb)](#HungryGames+deleteEvent)
         * [.makeAndAddEvent(id, type, creator, message, numVictim, numAttacker, victimOutcome, attackerOutcome, victimKiller, attackerKiller, vWeapon, aWeapon)](#HungryGames+makeAndAddEvent) ⇒ <code>string</code>
+        * [.saveEvent(type, event, cb)](#HungryGames+saveEvent)
         * [.addEvent(id, type, event)](#HungryGames+addEvent) ⇒ <code>string</code>
         * [.addMajorEvent(id, type, data, [name])](#HungryGames+addMajorEvent) ⇒ <code>string</code>
         * [.editMajorEvent(id, type, search, data, [name], [newName])](#HungryGames+editMajorEvent) ⇒ <code>string</code>
@@ -2793,6 +2794,7 @@ Hunger Games simulator.
         * [~numEventsPerPage](#HungryGames..numEventsPerPage) : <code>number</code> ℗
         * [~maxReactAwaitTime](#HungryGames..maxReactAwaitTime) : <code>number</code> ℗
         * [~findDelay](#HungryGames..findDelay) : <code>number</code> ℗
+        * [~exactEventIdRegex](#HungryGames..exactEventIdRegex) : <code>RegExp</code> ℗
         * [~defaultOptions](#HungryGames..defaultOptions) : <code>Object.&lt;{value: (string\|number\|boolean\|Object), values: ?Array.&lt;string&gt;, range: ?{min:number, max:number}, comment: string, category: string}&gt;</code> ℗
         * [~lotsOfDeathRate](#HungryGames..lotsOfDeathRate) : <code>number</code> ℗
         * [~littleDeathRate](#HungryGames..littleDeathRate) : <code>number</code> ℗
@@ -3178,7 +3180,7 @@ Allows editing teams. Entry for all team actions.
 <a name="HungryGames+deleteEvent"></a>
 
 ### hungryGames.deleteEvent(id, cb)
-Delete a custom event.
+Delete a custom event from a user's profile.
 
 **Kind**: instance method of [<code>HungryGames</code>](#HungryGames)  
 **Access**: public  
@@ -3213,6 +3215,22 @@ ID is an actual user.
 | attackerKiller | <code>boolean</code> | Do the attackers kill anyone. |
 | vWeapon | <code>Object</code> | The weapon information to give the victim. |
 | aWeapon | <code>Object</code> | The weapon information to give the attacker. |
+
+<a name="HungryGames+saveEvent"></a>
+
+### hungryGames.saveEvent(type, event, cb)
+Adds a given event to a user's custom events. If it already exists, it will
+override the existing file. Relies on the ID in `event` and `creator` in
+`event` to be accurate.
+
+**Kind**: instance method of [<code>HungryGames</code>](#HungryGames)  
+**Access**: public  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| type | <code>string</code> | The type of event this is. |
+| event | [<code>Event</code>](#HungryGames..Event) | The event to add. |
+| cb | <code>basicCB</code> | Callback to fire when the operation is complete. Single argument, string if error, or null if none. |
 
 <a name="HungryGames+addEvent"></a>
 
@@ -3270,7 +3288,7 @@ event, the major event gets deleted. (Arena or Weapon events)
 
 ### hungryGames.removeEvent(id, type, event) ⇒ <code>string</code>
 Searches custom events for the given one, then removes it from the custom
-events. (Bloodbath or Player events)
+events on a guild. (Bloodbath or Player events)
 
 **Kind**: instance method of [<code>HungryGames</code>](#HungryGames)  
 **Returns**: <code>string</code> - Error message or null if no error.  
@@ -3290,6 +3308,8 @@ Enable or disable an event without deleting it completely.
 **Kind**: instance method of [<code>HungryGames</code>](#HungryGames)  
 **Returns**: <code>string</code> - Error message or null if no error.  
 **Access**: public  
+**Todo:**: Update this to use the ID system. Requires giving IDs to all Major
+events as well.  
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -3302,7 +3322,7 @@ Enable or disable an event without deleting it completely.
 <a name="HungryGames+eventsEqual"></a>
 
 ### hungryGames.eventsEqual(e1, e2) ⇒ <code>boolean</code>
-Checks if the two given events are equivalent.
+Checks if the two given events are equivalent. Ignores the event ID.
 
 **Kind**: instance method of [<code>HungryGames</code>](#HungryGames)  
 
@@ -3959,6 +3979,14 @@ The delay after failing to find a guild's data to look for it again.
 
 **Kind**: inner constant of [<code>HungryGames</code>](#HungryGames)  
 **Default**: <code>15 Seconds</code>  
+**Access**: private  
+<a name="HungryGames..exactEventIdRegex"></a>
+
+### HungryGames~exactEventIdRegex : <code>RegExp</code> ℗
+Checks that the entire string is the ID with nothing extra.
+
+**Kind**: inner constant of [<code>HungryGames</code>](#HungryGames)  
+**Default**: <code>&lt;RegExp /^\d+\/\d+-\w+$/&gt;</code>  
 **Access**: private  
 <a name="HungryGames..defaultOptions"></a>
 
@@ -4935,7 +4963,8 @@ Swap random users between teams.
 <a name="HungryGames..createEvent"></a>
 
 ### HungryGames~createEvent(msg, id) : [<code>hgCommandHandler</code>](#HungryGames..hgCommandHandler) ℗
-Create a custom event for a guild.
+Create a custom event for a user and guild, or add an existing event to the
+guild.
 
 **Kind**: inner method of [<code>HungryGames</code>](#HungryGames)  
 **Access**: private  
